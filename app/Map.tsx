@@ -46,7 +46,10 @@ function LocationFinder() {
           const { latitude, longitude } = position.coords;
           
           // Center map on user location
-          map.setView([latitude, longitude], 14);
+          map.flyTo([latitude, longitude], 14, {
+            duration: 1.5,
+            animate: true
+          });
           
           // Add a marker at user's location
           L.marker([latitude, longitude], {
