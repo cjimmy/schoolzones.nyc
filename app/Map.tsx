@@ -7,13 +7,13 @@ import 'leaflet/dist/leaflet.css'; // Import CSS here as well to be safe
 
 
 // Component to add labels after the map is ready
-function FeatureLabels({ data }: { data: any }) {
+function FeatureLabels({ data }: { data: GeoJSON.FeatureCollection }) {
   const map = useMap();
   
   useEffect(() => {
     if (!data) return;
     // Add labels for each feature
-    data.features.forEach(feature => {
+    data.features.forEach((feature: GeoJSON.Feature) => {
       if (feature.properties && feature.properties.Label) {
         // Create a temporary layer to get the bounds
         const layer = L.geoJSON(feature);
@@ -78,7 +78,7 @@ function LocationFinder() {
 }
 
 export default function Map() {
-  const [geoJsonData, setGeoJsonData] = useState(null);
+  const [geoJsonData, setGeoJsonData] = useState<GeoJSON.FeatureCollection | null>(null);
   // Downtown Manhattan coordinates
   const initialPosition: [number, number] = [40.7128, -74.0060];
 
@@ -88,7 +88,11 @@ export default function Map() {
       .then(data => setGeoJsonData(data));
       
     // Fix Leaflet's default icon path issues
-    delete (L.Icon.Default.prototype as any)._getIconUrl;
+    interface ExtendedIconPrototype extends L.Icon.Default {
+      _getIconUrl?: () => string;
+    }
+
+    delete (L.Icon.Default.prototype as ExtendedIconPrototype)._getIconUrl;
     L.Icon.Default.mergeOptions({
       iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
       iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
@@ -96,7 +100,7 @@ export default function Map() {
     });
   }, []);
 
-  const onEachFeature = (feature: any, layer: any) => {
+  const onEachFeature = (feature: GeoJSON.Feature, layer: L.Layer) => {
     // Popup with properties
     if (feature.properties) {
       // Check if REMARKS exists and is not null
