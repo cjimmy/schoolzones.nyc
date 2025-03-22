@@ -25,13 +25,11 @@ export default function LocationFinder() {
           L.marker([latitude, longitude], {
             icon: L.divIcon({
               className: 'user-location-icon',
-              html: '<div>📍</div>',
+              html: '<div class="text-2xl">📍</div>',
               iconSize: [30, 30],
               iconAnchor: [15, 30]
             })
-          }).addTo(map)
-            .bindPopup('Your location')
-            .openPopup();
+          }).addTo(map);
         },
         (error) => {
           console.error('Error getting location:', error);

@@ -8,7 +8,7 @@ const interTight = Inter_Tight({
 });
 
 export const metadata: Metadata = {
-  title: "NYC School Zones | Unofficial Map",
+  title: "Unofficial NYC school zone map",
   description: "Unofficial map of NYC public school zones, using officialNYC Open Data.",
 };
 

@@ -5,7 +5,20 @@ import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css'; // Import CSS here as well to be safe
 import LocationFinder from './components/LocationFinder';
-import InfoModal from './components/InfoModal';
+
+const zoneStyle = {
+  fillColor: '#3388ff',
+  weight: 1.8,
+  opacity: 0.5,
+  color: '#555',
+  fillOpacity: 0.3,
+  dashArray: '',
+};
+
+const zoneStyleOnMouseOver = {
+  fillOpacity: 0.4,
+  weight: 2.5,
+};
 
 // Component to add labels after the map is ready
 function FeatureLabels({ data }: { data: GeoJSON.FeatureCollection }) {
@@ -15,7 +28,7 @@ function FeatureLabels({ data }: { data: GeoJSON.FeatureCollection }) {
     if (!data) return;
     // Add labels for each feature
     data.features.forEach((feature: GeoJSON.Feature) => {
-      if (feature.properties && feature.properties.Label) {
+      if (feature.properties && feature.properties.label) {
         // Create a temporary layer to get the bounds
         const layer = L.geoJSON(feature);
         const center = layer.getBounds().getCenter();
@@ -23,7 +36,7 @@ function FeatureLabels({ data }: { data: GeoJSON.FeatureCollection }) {
         L.marker(center, {
           icon: L.divIcon({
             className: 'label-icon',
-            html: `<div>${feature.properties.Label}</div>`,
+            html: `<div>${feature.properties.label}</div>`,
             iconSize: [100, 20],
             iconAnchor: [50, 10]
           })
@@ -37,12 +50,11 @@ function FeatureLabels({ data }: { data: GeoJSON.FeatureCollection }) {
 
 export default function Map() {
   const [geoJsonData, setGeoJsonData] = useState<GeoJSON.FeatureCollection | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   // Downtown Manhattan coordinates
   const initialPosition: [number, number] = [40.7128, -74.0060];
 
   useEffect(() => {
-    fetch('./data.geojson')
+    fetch('./elem-school-zones-with-names.geojson')
       .then(response => response.json())
       .then(data => setGeoJsonData(data));
       
@@ -58,50 +70,61 @@ export default function Map() {
       iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
       shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
     });
-
-    // Auto-open modal after 3 seconds
-    const timer = setTimeout(() => {
-      setIsModalOpen(true);
-    }, 3000);
-
-    return () => clearTimeout(timer);
   }, []);
 
   const onEachFeature = (feature: GeoJSON.Feature, layer: L.Layer) => {
-    // Popup with properties
+    let popup: L.Popup | null = null;
+    
+    // Prepare popup content
     if (feature.properties) {
-      // Check if REMARKS exists and is not null
-      if (feature.properties.REMARKS && feature.properties.REMARKS !== "null") {
-        // Only show REMARKS in the popup
-        layer.bindPopup(`<strong>Remarks:</strong> ${feature.properties.REMARKS}`);
+      const popupContent = [];
+      
+      if (feature.properties.name) {
+        popupContent.push(`<strong>${feature.properties.name}</strong>`);
+      }
+      
+      if (feature.properties.remarks && feature.properties.remarks !== "null") {
+        popupContent.push(`<div>Remarks: ${feature.properties.remarks}</div>`);
+      }
+      
+      if (popupContent.length > 0) {
+        // Create popup but don't bind it yet
+        popup = L.popup({
+          closeButton: false,
+          offset: L.point(0, -10),
+          className: 'hover-popup'
+        }).setContent(popupContent.join('<br>'));
       }
     }
     
     // Hover effects
     layer.on({
       mouseover: (e) => {
-        const layer = e.target;
-        layer.setStyle({
-          fillOpacity: 0.7,
-          weight: 2,
+        e.target.setStyle({
+          ...zoneStyle,
+          ...zoneStyleOnMouseOver
         });
+        
+        // Show popup if we have one
+        if (popup) {
+          popup.setLatLng(e.latlng).openOn(e.target._map);
+        }
+      },
+      mousemove: (e) => {
+        // Move popup with cursor
+        if (popup && popup.isOpen()) {
+          popup.setLatLng(e.latlng);
+        }
       },
       mouseout: (e) => {
-        const layer = e.target;
-        layer.setStyle({
-          fillOpacity: 0.5,
-          weight: 1,
-        });
+        e.target.setStyle(zoneStyle);
+        
+        // Close popup
+        if (popup) {
+          e.target._map.closePopup(popup);
+        }
       },
     });
-  };
-
-  const style = {
-    fillColor: '#3388ff',
-    weight: 1,
-    opacity: 1,
-    color: '#666',
-    fillOpacity: 0.5,
   };
 
   return (
@@ -109,7 +132,7 @@ export default function Map() {
       <MapContainer 
         center={initialPosition} 
         zoom={14} 
-        style={{ height: '100%', width: '100%' }}
+        style={{ height: 'calc(100% - 48px)', width: '100%', marginTop: '48px' }}
         // Add these props to ensure proper rendering
         scrollWheelZoom={true}
         zoomControl={true}
@@ -120,8 +143,8 @@ export default function Map() {
         }}
       >
         <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url={`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png`}
+          attribution={`&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>`}
         />
         <LocationFinder />
         {geoJsonData && (
@@ -129,28 +152,12 @@ export default function Map() {
             <GeoJSON 
               data={geoJsonData} 
               onEachFeature={onEachFeature}
-              style={style}
+              style={zoneStyle}
             />
             <FeatureLabels data={geoJsonData} />
           </>
         )}
       </MapContainer>
-
-      {/* Info Button */}
-      <button
-        onClick={() => setIsModalOpen(prev => !prev)}
-        className="fixed bottom-4 right-4 z-[400] bg-gray-900 rounded-full w-10 h-10 shadow-lg flex items-center justify-center hover:bg-gray-700 cursor-pointer"
-        aria-label="Information"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </button>
-
-      <InfoModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
     </>
   );
 }
